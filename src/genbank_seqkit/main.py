@@ -1,5 +1,8 @@
+import sys
+
 from utils.entrez_efetch import fetch_transcript_record
 from genbank_seqkit.logger import logger
+from utils._force_list import _force_list
 
 class Transcript:
     """
@@ -14,6 +17,9 @@ class Transcript:
         self.rna_sequence = None
         self.protein_sequence = None
         self.protein_id = None
+        self.length = None
+        self.mol_type = None
+        self.gene_name = None
 
         # Fetch and populate attributes automatically
         self._fetch_and_populate()
@@ -29,9 +35,36 @@ class Transcript:
             self.transcript_id = record.get('GBSeq_accession-version', self.transcript_id)
             self.dna_sequence = record['GBSeq_sequence'].upper()
             self.rna_sequence = self.dna_sequence.replace('T', 'U')
+            self.length = record.get("GBSeq_length")
+            self.mol_type = record.get("GBSeq_moltype")
+            self.gene_name = record.get("GBSeq_definition")
 
-            # TODO: Parse features for gene_symbol, hgnc_id, protein_sequence, protein_id
-            # for feature in record[...
+            # Parse feature table
+            features = _force_list(record.get("GBSeq_feature-table", {}).get("GBFeature"), verbose=False)
+            for feature in features:
+                key = feature.get("GBFeature_key")
+                quals = _force_list(feature.get("GBFeature_quals", {}).get("GBQualifier"), verbose=False)
+
+                # Gene symbol and HGNC ID
+                if key == "gene":
+                    for q in quals:
+                        if q.get("GBQualifier_name") == "gene":
+                            self.gene_symbol = q.get("GBQualifier_value")
+                        elif q.get("GBQualifier_name") == "db_xref":
+                            if q.get("GBQualifier_value", "").startswith("HGNC:"):
+                                self.hgnc_id = q.get("GBQualifier_value").replace("HGNC:", "")
+
+                # CDS and protein info
+                elif key == "CDS":
+                    for q in quals:
+                        if q.get("GBQualifier_name") == "translation":
+                            self.protein_sequence = q.get("GBQualifier_value")
+                        elif q.get("GBQualifier_name") == "protein_id":
+                            self.protein_id = q.get("GBQualifier_value")
+
+        except TranscriptIdError as e:
+            logger.error(f"Invalid transcript ID: {self.transcript_id} - {e}")
+            raise
 
         except Exception as e:
             logger.error(f"Failed to fetch transcript {self.transcript_id}: {e}")
@@ -51,8 +84,24 @@ class Transcript:
 
 # Demo
 if __name__ == "__main__":
+
+    # import pprint
+    # import json
+    #
+    # record = fetch_transcript_record("NM_000093.5")
+    # pprint.pprint(record)
+    #
+    # with open("record.json", "w") as f:
+    #     json.dump(record,f, indent = 2)
+
+
     t = Transcript("NM_000093.5")
     print(t.transcript_id)
     print(t.dna_sequence[:50])  # first 50 bases
     print(t.as_fasta(t.dna_sequence))
+    print(t.length)
+    print(t.mol_type)
+    print(t.gene_symbol)
+    print(t.protein_sequence)
+    print(t.hgnc_id)
 

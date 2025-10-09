@@ -10,6 +10,9 @@ def create_logger():
     current_directory = str(Path(__file__).resolve().parent)
     parent_directory = Path(current_directory).parent.parent
 
+    # Ensure the logs directory exists
+    log_dir = parent_directory / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     # Create logger
     logger = logging.getLogger('genbank_seqkit_logger')
