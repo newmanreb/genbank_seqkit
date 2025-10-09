@@ -70,14 +70,45 @@ class Transcript:
             logger.error(f"Failed to fetch transcript {self.transcript_id}: {e}")
             raise
 
-    def as_fasta(self, sequence:str) -> str:
+    def as_fasta(self, sequence=None, seq_type="DNA"):
         """
         Return FASTA formatted sequence string for the given sequence.
-        :param sequence:
-        :return:
+        Defaults to the DNA transcript sequence if none is provided.
+
+        Parameters
+        ------------
+        sequence : str, optional
+            The sequence to format. Defaults to self.dna_sequence.
+        seq_type: str, optional
+            The type of sequence to return, can be "DNA", "RNA" or "protein". Defaults to "DNA".
+
+        Returns
+        ------------
+        str
+            FASTA formatted string.
+
+        Raises
+        ------------
+        ValueError
+            If unknown seq_type is input.
+
         """
-        # TODO: Implement proper GenBank formatting.
-        return
+        if sequence is None:
+            if seq_type.upper() == "DNA":
+                sequence = self.dna_sequence
+            elif seq_type.upper() == "RNA":
+                sequence = self.rna_sequence
+            elif seq_type.upper() == "protein":
+                sequence = self.protein_sequence
+            else:
+                raise ValueError(f"Unknown seq_type: {seq_type}")
+
+        if sequence is None:
+            return f">{self.transcript_id} | {seq_type}\n"
+
+        header = f">{self.transcript_id} | {seq_type}"
+        return f"{header}\n{sequence}"
+
 
     def __repr__(self):
         return f"<Transcript {self.transcript_id}>"
@@ -104,4 +135,5 @@ if __name__ == "__main__":
     print(t.gene_symbol)
     print(t.protein_sequence)
     print(t.hgnc_id)
+    print(t.as_fasta())
 
