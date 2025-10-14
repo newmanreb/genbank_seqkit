@@ -74,6 +74,7 @@ class Transcript:
         """
         Return FASTA formatted sequence string for the given sequence.
         Defaults to the DNA transcript sequence if none is provided.
+        Logs warnings if the sequence is missing and errors for unknown types.
 
         Parameters
         ------------
@@ -101,14 +102,63 @@ class Transcript:
             elif seq_type.upper() == "protein":
                 sequence = self.protein_sequence
             else:
+                logger.error(f"Unknown sequence type requested: {seq_type}")
                 raise ValueError(f"Unknown seq_type: {seq_type}")
 
-        if sequence is None:
-            return f">{self.transcript_id} | {seq_type}\n"
+        if sequence is None or sequence == "":
+            logger.warning(f"{seq_type} sequence not available for {self.transcript_id}")
+            sequence = ""
 
         header = f">{self.transcript_id} | {seq_type}"
-        return f"{header}\n{sequence}"
+        fasta_str = f"{header}\n{sequence}"
 
+        logger.debug(f"Generated FASTA formatted sequence for {self.transcript_id}, seq_type: {seq_type}")
+        return fasta_str
+
+    def as_genbank(self, sequence=None, seq_type="DNA"):
+        """
+        Return a simple GenBank-like formatted string.
+        Defaults to the DNA transcript sequence if none is provided.
+
+        Parameters
+        ------------
+        sequence: str, optional
+            The sequence to format. Defaults to self.dna_sequence.
+        seq_type: str, optional
+            The type of sequence to return. Defaults to "DNA".
+
+        Returns
+        ------------
+        str
+            Simple GenBank-like formatted string.
+
+        Raises
+        ------------
+        ValueError: If unknown seq_type is input.
+
+        """
+        if sequence is None:
+            if seq_type.upper() == "DNA":
+                sequence = self.dna_sequence
+            elif seq_type.upper() == "RNA":
+                sequence = self.rna_sequence
+            elif seq_type.upper() == "protein":
+                sequence = self.protein_sequence
+            else:
+                raise ValueError(f"Unknown seq_type: {seq_type}")
+
+        if sequence is None or sequence == "":
+            logger.warning(f"{seq_type} sequence not available for {self.transcript_id}")
+            sequence = ""
+
+        genbank_str = (
+            f"LOCUS        {self.transcript_id}\n"
+            f"DEFINITION   {seq_type} sequence\n"
+            f"ORIGIN\n{sequence}\n//"
+        )
+
+        logger.debug(f"Generated GenBank string for {self.transcript_id}, seq_type: {seq_type}")
+        return genbank_str
 
     def __repr__(self):
         return f"<Transcript {self.transcript_id}>"
@@ -136,4 +186,5 @@ if __name__ == "__main__":
     print(t.protein_sequence)
     print(t.hgnc_id)
     print(t.as_fasta())
+    print(t.as_genbank(seq_type="RNA"))
 
