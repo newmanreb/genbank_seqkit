@@ -1,4 +1,5 @@
 import sys
+import logging
 
 from utils.entrez_efetch import fetch_transcript_record
 from genbank_seqkit.logger import logger
@@ -24,12 +25,27 @@ class Transcript:
         # Fetch and populate attributes automatically
         self._fetch_and_populate()
 
-    def _fetch_and_populate(self):
+    def _fetch_and_populate(self, verbose=False):
         """
         Internal method to fetch the GenBank record using entrez_efetch and populate key attributes.
+
+        Parameters
+        ------------
+        verbose: bool, optional
+            If True, logs detailed messages about each step of the population process.
+
+        Raises
+        ------------
+        TranscriptIdError
+            If an invalid transcript ID is provided.
         """
+
+        # Logger depends on if verbose is True or not
+        temp_logger = logger if verbose else logging.getLogger("null_logger")
+
         try:
             record = fetch_transcript_record(self.transcript_id)
+            temp_logger.debug(f"Fetched transcript record {self.transcript_id}")
 
             # Top-level fields:
             self.transcript_id = record.get('GBSeq_accession-version', self.transcript_id)
@@ -38,9 +54,14 @@ class Transcript:
             self.length = record.get("GBSeq_length")
             self.mol_type = record.get("GBSeq_moltype")
             self.gene_name = record.get("GBSeq_definition")
+            temp_logger.debug(f"Top-level attributes loaded: length={self.length}, mol_type={self.mol_type}, "
+                              f"gene name={self.gene_name}")
 
             # Parse feature table
             features = _force_list(record.get("GBSeq_feature-table", {}).get("GBFeature"), verbose=False)
+            if not features:
+                temp_logger.warning(f"No features found for transcript {self.transcript_id}")
+
             for feature in features:
                 key = feature.get("GBFeature_key")
                 quals = _force_list(feature.get("GBFeature_quals", {}).get("GBQualifier"), verbose=False)
@@ -50,17 +71,32 @@ class Transcript:
                     for q in quals:
                         if q.get("GBQualifier_name") == "gene":
                             self.gene_symbol = q.get("GBQualifier_value")
+                            temp_logger.debug(f"Gene symbol found: {self.gene_symbol}")
                         elif q.get("GBQualifier_name") == "db_xref":
-                            if q.get("GBQualifier_value", "").startswith("HGNC:"):
-                                self.hgnc_id = q.get("GBQualifier_value").replace("HGNC:", "")
+                            val = q.get("GBQualifier_value", "")
+                            if val.startswith("HGNC:"):
+                                self.hgnc_id = val.replace("HGNC:", "")
+                                temp_logger.debug(f"HGNC ID found: {self.hgnc_id}")
 
                 # CDS and protein info
                 elif key == "CDS":
                     for q in quals:
                         if q.get("GBQualifier_name") == "translation":
                             self.protein_sequence = q.get("GBQualifier_value")
+                            temp_logger.debug(f"Protein sequence found, length={len(self.protein_sequence)}")
                         elif q.get("GBQualifier_name") == "protein_id":
                             self.protein_id = q.get("GBQualifier_value")
+                            temp_logger.debug(f"Protein ID found: {self.protein_id}")
+
+            # Log any missing attributes
+            if not self.gene_symbol:
+                temp_logger.warning(f"No gene symbol found for transcript {self.transcript_id}")
+            if not self.hgnc_id:
+                temp_logger.warning(f"No hgnc ID found for transcript {self.transcript_id}")
+            if not self.protein_sequence:
+                temp_logger.warning(f"No protein sequence found for transcript {self.transcript_id}")
+            if not self.protein_id:
+                temp_logger.warning(f"Protein ID missing for {self.transcript_id}")
 
         except TranscriptIdError as e:
             logger.error(f"Invalid transcript ID: {self.transcript_id} - {e}")
@@ -177,14 +213,15 @@ if __name__ == "__main__":
 
 
     t = Transcript("NM_000093.5")
-    print(t.transcript_id)
-    print(t.dna_sequence[:50])  # first 50 bases
-    print(t.as_fasta(t.dna_sequence))
-    print(t.length)
-    print(t.mol_type)
-    print(t.gene_symbol)
-    print(t.protein_sequence)
-    print(t.hgnc_id)
-    print(t.as_fasta())
-    print(t.as_genbank(seq_type="RNA"))
+    # print(t.transcript_id)
+    # print(t.dna_sequence[:50])  # first 50 bases
+    # print(t.as_fasta(t.dna_sequence))
+    # print(t.length)
+    # print(t.mol_type)
+    # print(t.gene_symbol)
+    # print(t.protein_sequence)
+    # print(t.hgnc_id)
+    # print(t.as_fasta())
 
+    t._fetch_and_populate(verbose=True)
+    print(t.as_genbank(seq_type="RNA"))

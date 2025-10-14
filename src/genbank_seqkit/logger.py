@@ -28,7 +28,7 @@ def create_logger():
     file_handler = RotatingFileHandler(str(parent_directory) + '/logs/genbank_seqkit.log',
                                        maxBytes=500000,  # 500 KB
                                        backupCount=2)
-    file_handler.setLevel(logging.ERROR)
+    file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
     file_handler.setFormatter(file_formatter)
 
