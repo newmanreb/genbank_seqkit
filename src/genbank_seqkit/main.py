@@ -1,4 +1,3 @@
-import sys
 import logging
 
 from utils.entrez_efetch import fetch_transcript_record
@@ -9,7 +8,7 @@ class Transcript:
     """
     Represents a GenBank transcript record. Automatically fetches data from NCBI and populates key attributes.
     """
-    def __init__(self, transcript_id: str):
+    def __init__(self, transcript_id: str, verbose=False):
         # Core attributes
         self.transcript_id = transcript_id
         self.gene_symbol = None
@@ -23,7 +22,11 @@ class Transcript:
         self.gene_name = None
 
         # Fetch and populate attributes automatically
-        self._fetch_and_populate()
+        self._fetch_and_populate(verbose=verbose)
+
+    def refresh(self, verbose=False):
+        """ Public method for re-fetching and updating the transcript. """
+        self._fetch_and_populate(verbose=verbose)
 
     def _fetch_and_populate(self, verbose=False):
         """
@@ -212,7 +215,7 @@ if __name__ == "__main__":
     #     json.dump(record,f, indent = 2)
 
 
-    t = Transcript("NM_000093.5")
+    t = Transcript("NM_000093.5", verbose=True)
     # print(t.transcript_id)
     # print(t.dna_sequence[:50])  # first 50 bases
     # print(t.as_fasta(t.dna_sequence))
@@ -223,5 +226,4 @@ if __name__ == "__main__":
     # print(t.hgnc_id)
     # print(t.as_fasta())
 
-    t._fetch_and_populate(verbose=True)
     print(t.as_genbank(seq_type="RNA"))
