@@ -65,7 +65,7 @@ def fetch_transcript_record(transcript_id):
     return xmltodict.parse(r.text)['GBSet']['GBSeq']
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     # Example usage: fetch a GenBank transcript record (e.g. COL5A1 mRNA RefSeq)
     record = fetch_transcript_record("NM_000093.5")
 

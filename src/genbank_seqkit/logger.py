@@ -10,6 +10,9 @@ def create_logger():
     current_directory = str(Path(__file__).resolve().parent)
     parent_directory = Path(current_directory).parent.parent
 
+    # Ensure the logs directory exists
+    log_dir = parent_directory / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     # Create logger
     logger = logging.getLogger('genbank_seqkit_logger')
@@ -25,7 +28,7 @@ def create_logger():
     file_handler = RotatingFileHandler(str(parent_directory) + '/logs/genbank_seqkit.log',
                                        maxBytes=500000,  # 500 KB
                                        backupCount=2)
-    file_handler.setLevel(logging.ERROR)
+    file_handler.setLevel(logging.DEBUG)
     file_formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
     file_handler.setFormatter(file_formatter)
 
