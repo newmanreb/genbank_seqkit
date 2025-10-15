@@ -24,10 +24,6 @@ class Transcript:
         # Fetch and populate attributes automatically
         self._fetch_and_populate(verbose=verbose)
 
-    def refresh(self, verbose=False):
-        """ Public method for re-fetching and updating the transcript. """
-        self._fetch_and_populate(verbose=verbose)
-
     def _fetch_and_populate(self, verbose=False):
         """
         Internal method to fetch the GenBank record using entrez_efetch and populate key attributes.
@@ -108,6 +104,10 @@ class Transcript:
         except Exception as e:
             logger.error(f"Failed to fetch transcript {self.transcript_id}: {e}")
             raise
+
+    def refresh(self, verbose=False):
+        """ Public method for re-fetching and updating the transcript. """
+        self._fetch_and_populate(verbose=verbose)
 
     def as_fasta(self, sequence=None, seq_type="DNA"):
         """
@@ -200,11 +200,25 @@ class Transcript:
         return genbank_str
 
     def __repr__(self):
+        """
+        Developer-friendly representation for the REPL or debugging.
+        Shows the class name and transcript ID.
+        """
         return f"<Transcript {self.transcript_id}>"
 
-# Demo
-if __name__ == "__main__":
+    def __str__(self):
+        """
+        User-friendly string representation.
+        Includes transcript ID, gene symbol (if available), and length.
+        """
+        gene = self.gene_symbol if self.gene_symbol else "Unknown"
+        length = self.length if self.length else "Unknown"
+        return f"Transcript: {self.transcript_id} | Gene: {gene} | Length: {length} bp"
 
+# Demo
+if __name__ == "__main__": # pragma: no cover
+
+    ## Use this code block to create a .json file for development.
     # import pprint
     # import json
     #
@@ -216,6 +230,7 @@ if __name__ == "__main__":
 
 
     t = Transcript("NM_000093.5", verbose=True)
+    print(t)
     # print(t.transcript_id)
     # print(t.dna_sequence[:50])  # first 50 bases
     # print(t.as_fasta(t.dna_sequence))
@@ -225,5 +240,5 @@ if __name__ == "__main__":
     # print(t.protein_sequence)
     # print(t.hgnc_id)
     # print(t.as_fasta())
+    # print(t.as_genbank(seq_type="RNA"))
 
-    print(t.as_genbank(seq_type="RNA"))
