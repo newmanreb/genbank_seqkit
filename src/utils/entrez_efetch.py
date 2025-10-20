@@ -1,15 +1,7 @@
 import requests
 import xmltodict
 from genbank_seqkit.logger import logger
-
-
-class TranscriptIdError(Exception):
-    """
-    Custom exception raised when a transcript identifier does not meet the
-    expected NCBI format requirements.
-    """
-    pass
-
+from genbank_seqkit.errors import TranscriptIdError
 
 def fetch_transcript_record(transcript_id):
     """
