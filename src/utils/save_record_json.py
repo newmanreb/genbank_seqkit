@@ -69,4 +69,4 @@ def save_record_json(transcript_id: str, filename: str = None,
 
 if __name__ == "__main__": # pragma: no cover
 
-    save_record_json(transcript_id="NM_000067.3")
+    save_record_json(transcript_id="NM_000093.5")
