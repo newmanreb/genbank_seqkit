@@ -1,6 +1,6 @@
 name: Run tests and upload coverage
 
-on: 
+on:
   push
 
 jobs:
@@ -15,14 +15,23 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
 
       - name: Install dependencies
-        run: pip install pytest pytest-cov
+        run: |
+          pip install --upgrade pip
+          pip install pytest pytest-cov
+          pip install -r requirements.txt || echo "No requirements file, skipping"
+
+      - name: Install package in editable mode
+        run: pip install -e ./src
 
       - name: Run tests
-        run: pytest --cov --cov-branch --cov-report=xml
+        run: pytest --cov=genbank_seqkit --cov-branch --cov-report=xml
 
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
