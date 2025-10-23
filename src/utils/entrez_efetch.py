@@ -1,7 +1,11 @@
 import requests
 import xmltodict
 from genbank_seqkit.logger import logger
-from genbank_seqkit.errors import TranscriptIdError
+from genbank_seqkit.errors import (
+    TranscriptIdError,
+    GenbankFetchError,
+    GenbankParseError,
+)
 
 def fetch_transcript_record(transcript_id):
     """
@@ -37,24 +41,32 @@ def fetch_transcript_record(transcript_id):
             "(e.g., NM_000093.4)."
         )
 
+    # --- Fetch from Entrez ---
     # Base URL for NCBI Entrez EFetch
     url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
     params = {
-        "db": "nucleotide",   # NCBI nucleotide database
-        "id": transcript_id,  # transcript accession
-        "retmode": "xml"      # request XML format for easier parsing
+        "db": "nucleotide",                     # NCBI nucleotide database
+        "id": transcript_id,                    # transcript accession
+        "retmode": "xml"                        # request XML format for easier parsing
     }
 
     try:
         # Perform GET request to NCBI EFetch
-        r = requests.get(url, params=params)
-        r.raise_for_status()  # Raise an exception for HTTP errors
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()                    # Raise an exception for HTTP errors
     except requests.exceptions.RequestException as e:
         logger.error(f"Error fetching transcript {transcript_id}: {e}")
-        raise
+        raise GenbankFetchError(transcript_id, str(e)) from e
 
-    # Convert XML response to Python dict using xmltodict and stript out the GBSet/GBSeq wrapper
-    return xmltodict.parse(r.text)['GBSet']['GBSeq']
+    # --- Parse XML response ---
+    try:
+        data = xmltodict.parse(response.text)
+        record = data['GBSet']['GBSeq']
+    except Exception as e:
+        logger.error(f"Error parsing XML for {transcript_id}: {e}")
+        raise GenbankParseError(transcript_id, str(e)) from e
+
+    return record
 
 
 if __name__ == "__main__": # pragma: no cover
@@ -62,9 +74,9 @@ if __name__ == "__main__": # pragma: no cover
     record = fetch_transcript_record("NM_000093.5")
 
     # Top-level metadata fields from the GenBank record
-    print(record['GBSeq_accession-version'])   # Accession with version, e.g. "NM_000093.5"
-    print(record['GBSeq_definition'])          # Definition line, e.g. "collagen alpha-1(V) chain (COL5A1), mRNA"
-    print(record['GBSeq_keywords'])            # Keywords list, e.g. ["RefSeq", "mRNA", "collagen"]
+    print(record['GBSeq_accession-version'])    # Accession with version, e.g. "NM_000093.5"
+    print(record['GBSeq_definition'])           # Definition line, e.g. "collagen alpha-1(V) chain (COL5A1), mRNA"
+    print(record['GBSeq_keywords'])             # Keywords list, e.g. ["RefSeq", "mRNA", "collagen"]
 
     # Print the raw nucleotide sequence in uppercase
     print(record['GBSeq_sequence'].upper())

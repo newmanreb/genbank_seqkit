@@ -34,10 +34,9 @@ class GenbankValidationError(GenbankError):
         super().__init__(self.message)
 
 
-class TranscriptIdError(Exception):
+class TranscriptIdError(GenbankValidationError):
     """
-    Custom exception raised when a transcript identifier does not meet the
-    expected NCBI format requirements.
+    Raised when a transcript identifier does not meet the expected NCBI RefSeq format requirements.
     """
     pass
 
