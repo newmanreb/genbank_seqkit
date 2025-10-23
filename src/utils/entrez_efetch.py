@@ -22,9 +22,12 @@ def fetch_transcript_record(transcript_id):
         parsed from the XML response.
 
     Raises:
-    TranscriptIdError: If the transcript_id does not have the expected prefix
-        or lacks a version number.
-    requests.exceptions.RequestException: If there is a network or API error.
+    TranscriptIdError
+        If the transcript_id does not have the expected prefix or lacks a version number.
+    GenbankFetchError
+        If the network request fails (e.g. timeout, 404)
+    GenbankParseError
+        If the XML cannot be parsed into a valid record.
     """
 
     # Validate that the transcript ID has the expected RefSeq prefix
