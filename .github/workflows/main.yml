@@ -1,35 +1,42 @@
 name: Run tests and upload coverage
 
 on:
-  push
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
   test:
     name: Run tests and collect coverage
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      # 1. Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      # 2. Set up conda environment
+      - name: Set up conda
+        uses: conda-incubator/setup-miniconda@v3
         with:
-          python-version: '3.12'
+          environment-file: environment.yml
+          activate-environment: genbank_seqkit
+          python-version: 3.12
+          auto-update-conda: true
 
-      - name: Install dependencies
+      # 3. Install pip-only packages
+      - name: Install pip dependencies
         run: |
-          pip install --upgrade pip
-          pip install pytest pytest-cov
-          pip install -r requirements.txt || echo "No requirements file, skipping"
+          pip install pytest pytest-cov codecov
 
+      # 4. Run tests with coverage
       - name: Run tests
         run: |
           export PYTHONPATH=$PYTHONPATH:./src
           pytest --cov=genbank_seqkit --cov-branch --cov-report=xml
 
-      - name: Upload results to Codecov
+      # 5. Upload coverage to Codecov
+      - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}

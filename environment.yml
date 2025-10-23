@@ -3,5 +3,11 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python==3.12.8
+  - python=3.12
   - pip
+  - requests
+  - pytest
+  - pytest-cov
+  - coverage
+  - pip:
+      - codecov
