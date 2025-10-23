@@ -230,7 +230,7 @@ if __name__ == "__main__": # pragma: no cover
 
 
     t = Transcript("NM_000093.5", verbose=True)
-    print(t)
+    # print(t)
     # print(t.transcript_id)
     # print(t.dna_sequence[:50])  # first 50 bases
     # print(t.as_fasta(t.dna_sequence))

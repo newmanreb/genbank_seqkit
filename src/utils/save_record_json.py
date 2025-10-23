@@ -6,13 +6,22 @@ import sys
 import json
 from pprint import pprint
 from pathlib import Path
+
 sys.path.append(str(Path(__file__).resolve().parent))    # Adds utils/ folder to path
 from entrez_efetch import fetch_transcript_record
 from genbank_seqkit.logger import logger
+from genbank_seqkit.errors import (
+    GenbankFetchError,
+    GenbankParseError,
+    TranscriptIdError,
+    GenbankError,
+)
 
-def save_record_json(transcript_id: str, filename: str = None,
+def save_record_json(transcript_id: str,
+                     filename: str = None,
                      data_dir: Path = Path(__file__).resolve().parents[2] / "test_data",
-                     pretty_print: bool = False) -> Path:
+                     pretty_print: bool = False,
+                     ) -> Path:
     """
     Fetch a GenBank transcript record and save it as a JSON file.
 
@@ -34,39 +43,44 @@ def save_record_json(transcript_id: str, filename: str = None,
 
     Raises
     ------------
-    Exception
-        If fetching or saving the record fails.
+    TranscriptIdError
+        If the provided transcript ID is invalid.
+    GenbankFetchError
+        If the record cannot be fetched from Entrez.
+    GenbankParseError
+        If the XML data cannot be parsed.
+    GenbankError
+        If saving the record fails for any other reason (e.g. file write issues).
     """
 
     try:
-        # Create a .json file to store the record in test_data
-        data_dir.mkdir(parents=True, exist_ok=True)
-        if filename is None:
-            filename = data_dir / f"{transcript_id}.json"
+        data_dir.mkdir(parents=True, exist_ok=True)                 # Create directory if missing
+        if filename is None:                                        # Default filename
+            filename = data_dir / f"{transcript_id}.json"           # .json file created
         else:
             filename = Path(filename)
 
-        # Fetch the record
+        # Fetch the record (may raise TranscriptIdError, GenbankFetchError, or GenbankParseError)
         logger.debug(f"Fetching transcript record {transcript_id} to {filename}...")
         record = fetch_transcript_record(transcript_id)
 
-        # Pretty-print to console if requested
-        if pretty_print:
+        if pretty_print:                                            # Pretty-print to console if requested
             pprint(record)
 
-        # Save the record
-        with open(filename, "w") as f:
-            json.dump(record, f, indent=2)
+        with open(filename, "w") as f:                              # Save the record
+            json.dump(record, f, indent=2)                          # indent=2 provides pretty indentation
 
-        # Log success
-        logger.debug(f"Record for {transcript_id} saved to {filename}")
+        logger.debug(f"Record for {transcript_id} saved to {filename}") # Log success
 
         return filename
 
-    except Exception as e:
-        logger.error(f"Failed to save record for {transcript_id}: {e}")
-        raise
+    except (TranscriptIdError, GenbankFetchError, GenbankParseError):
+        raise                                                       # Raise these exceptions unchanged
+
+    except Exception as e:                                          # Catch-all exception for unexpected issues
+        logger.error(f"Unexpected error saving record for {transcript_id}: {e}")
+        raise GenbankError (f"Failed to save record: {e}") from e
 
 if __name__ == "__main__": # pragma: no cover
 
-    save_record_json(transcript_id="NM_000067.3")
+    save_record_json(transcript_id="NM_000093.5")
