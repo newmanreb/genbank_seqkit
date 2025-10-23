@@ -1,8 +1,8 @@
 import logging
 
-from utils.entrez_efetch import fetch_transcript_record
+from genbank_seqkit.utils.entrez_efetch import fetch_transcript_record
 from genbank_seqkit.logger import logger
-from utils._force_list import _force_list
+from genbank_seqkit.utils import _force_list
 
 class Transcript:
     """
