@@ -1,5 +1,5 @@
 import pytest
-from genbank_seqkit.main import Transcript
+from genbank_seqkit.transcript import Transcript
 from unittest.mock import patch
 
 # Test that a Transcript object instantiates correctly
