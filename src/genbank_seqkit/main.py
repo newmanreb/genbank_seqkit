@@ -3,6 +3,12 @@ import logging
 from genbank_seqkit.utils.entrez_efetch import fetch_transcript_record
 from genbank_seqkit.logger import logger
 from genbank_seqkit.utils import _force_list
+from genbank_seqkit.errors import (
+    TranscriptIdError,
+    GenbankFetchError,
+    GenbankParseError,
+    GenbankError
+)
 
 class Transcript:
     """
@@ -37,6 +43,12 @@ class Transcript:
         ------------
         TranscriptIdError
             If an invalid transcript ID is provided.
+        GenbankFetchError
+            If fetching the record from NCBI fails.
+        GenbankParseError
+            If parsing the XML record fails.
+        GenbankError
+            For any unexpected error encountered during population.
         """
 
         # Logger depends on if verbose is True or not
@@ -61,6 +73,7 @@ class Transcript:
             if not features:
                 temp_logger.warning(f"No features found for transcript {self.transcript_id}")
 
+            # Find Qualifiers within feature table and define as 'quals' and Feature key as 'key'
             for feature in features:
                 key = feature.get("GBFeature_key")
                 quals = _force_list(feature.get("GBFeature_quals", {}).get("GBQualifier"), verbose=False)
@@ -97,12 +110,13 @@ class Transcript:
             if not self.protein_id:
                 temp_logger.warning(f"Protein ID missing for {self.transcript_id}")
 
-        except TranscriptIdError as e:
-            logger.error(f"Invalid transcript ID: {self.transcript_id} - {e}")
+        except (TranscriptIdError, GenbankFetchError, GenbankParseError) as e:
+            logger.error(f"Error processing transcript {self.transcript_id}: {e}")
             raise
 
         except Exception as e:
             logger.error(f"Failed to fetch transcript {self.transcript_id}: {e}")
+            raise GenbankError(f"Failed to populate transcript {self.transcript_id}") from e
             raise
 
     def refresh(self, verbose=False):
@@ -164,7 +178,7 @@ class Transcript:
         sequence: str, optional
             The sequence to format. Defaults to self.dna_sequence.
         seq_type: str, optional
-            The type of sequence to return. Defaults to "DNA".
+            The type of sequence to return, can be "DNA", "RNA" or "protein". Defaults to "DNA".
 
         Returns
         ------------
@@ -184,6 +198,7 @@ class Transcript:
             elif seq_type.upper() == "protein":
                 sequence = self.protein_sequence
             else:
+                logger.error(f"Unknown sequence type requested: {seq_type}")
                 raise ValueError(f"Unknown seq_type: {seq_type}")
 
         if sequence is None or sequence == "":
