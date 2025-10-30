@@ -14,7 +14,7 @@ from genbank_seqkit.errors import (
     GenbankParseError,
     GenbankError
 )
-from genbank_seqkit.main import Transcript  # Your Transcript class
+from genbank_seqkit.transcript import Transcript  # Your Transcript class
 
 def main(transcript_id: str, verbose: bool = False):
     """
