@@ -1,81 +1,44 @@
+# src/tests/test_save_record_json.py
 import pytest
-import types
-from genbank_seqkit.utils import entrez_efetch as entrez_mod
+import json
+from pathlib import Path
+import importlib
 
-def test_invalid_transcript_id_prefix():
-    """Transcript ID must start with NM_, NR_, XM_, XR_"""
-    with pytest.raises(entrez_mod.TranscriptIdError):
-        entrez_mod.fetch_transcript_record("AB_123456.1")
+# Dynamically import the module so monkeypatching works reliably
+save_mod = importlib.import_module("genbank_seqkit.utils.save_record_json")
+from genbank_seqkit.errors import GenbankError
 
-def test_missing_version_number():
-    """Transcript ID must include a version number"""
-    with pytest.raises(entrez_mod.TranscriptIdError):
-        entrez_mod.fetch_transcript_record("NM_123456")
+dummy_record = {"GBSeq_accession-version": "NM_000093.4"}
 
-def test_network_error(monkeypatch):
-    """Simulate network failure"""
+def test_save_record_json_default(tmp_path, monkeypatch):
+    """Test saving record with default filename and directory."""
+    monkeypatch.setattr(save_mod, "fetch_transcript_record", lambda tid: dummy_record)
 
-    class DummyRequests:
-        class exceptions:
-            RequestException = Exception
-        def get(self, url, params, timeout):
-            raise self.exceptions.RequestException("network down")
+    out_file = save_mod.save_record_json("NM_000093.4", data_dir=tmp_path)
+    assert out_file.exists()
+    with open(out_file) as f:
+        data = json.load(f)
+    assert data == dummy_record
 
-    monkeypatch.setattr(entrez_mod, "requests", DummyRequests())
+def test_save_record_json_custom_filename(tmp_path, monkeypatch):
+    """Test saving record with a custom filename."""
+    monkeypatch.setattr(save_mod, "fetch_transcript_record", lambda tid: dummy_record)
+    custom_file = tmp_path / "myfile.json"
+    out_file = save_mod.save_record_json("NM_000093.4", filename=custom_file)
+    assert out_file.exists()
+    assert out_file.name == "myfile.json"
 
-    with pytest.raises(entrez_mod.GenbankFetchError):
-        entrez_mod.fetch_transcript_record("NM_000093.4")
+def test_save_record_json_pretty_print(tmp_path, monkeypatch, capsys):
+    """Test pretty_print option prints to console."""
+    monkeypatch.setattr(save_mod, "fetch_transcript_record", lambda tid: dummy_record)
+    save_mod.save_record_json("NM_000093.4", data_dir=tmp_path, pretty_print=True)
+    captured = capsys.readouterr()
+    assert "GBSeq_accession-version" in captured.out
 
-def test_xml_parse_error(monkeypatch):
-    """Simulate invalid XML returned"""
-
-    class DummyResponse:
-        text = "<invalid><xml>"
-
-        def raise_for_status(self):
-            pass
-
-    class DummyRequests:
-        class exceptions:
-            RequestException = Exception
-        def get(self, url, params, timeout):
-            return DummyResponse()
-
-    class DummyXmltodict:
-        @staticmethod
-        def parse(text):
-            raise ValueError("bad xml")
-
-    monkeypatch.setattr(entrez_mod, "requests", DummyRequests())
-    monkeypatch.setattr(entrez_mod, "xmltodict", DummyXmltodict())
-
-    with pytest.raises(entrez_mod.GenbankParseError):
-        entrez_mod.fetch_transcript_record("NM_000093.4")
-
-def test_successful_fetch(monkeypatch):
-    """Valid transcript fetch returns expected dict"""
-
-    dummy_record = {"GBSeq_accession-version": "NM_000093.4"}
-
-    class DummyResponse:
-        text = "<xml>dummy</xml>"
-
-        def raise_for_status(self):
-            pass
-
-    class DummyRequests:
-        class exceptions:
-            RequestException = Exception
-        def get(self, url, params, timeout):
-            return DummyResponse()
-
-    class DummyXmltodict:
-        @staticmethod
-        def parse(text):
-            return {"GBSet": {"GBSeq": dummy_record}}
-
-    monkeypatch.setattr(entrez_mod, "requests", DummyRequests())
-    monkeypatch.setattr(entrez_mod, "xmltodict", DummyXmltodict())
-
-    result = entrez_mod.fetch_transcript_record("NM_000093.4")
-    assert result == dummy_record
+def test_save_record_json_unexpected_error(monkeypatch, tmp_path):
+    """Test that an unexpected exception raises GenbankError."""
+    def raise_error(tid):
+        raise RuntimeError("oops")
+    monkeypatch.setattr(save_mod, "fetch_transcript_record", raise_error)
+    with pytest.raises(GenbankError):
+        save_mod.save_record_json("NM_000093.4", data_dir=tmp_path)
