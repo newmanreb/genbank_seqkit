@@ -3,7 +3,7 @@ from genbank_seqkit.transcript import Transcript
 from unittest.mock import patch
 
 # Test that a Transcript object instantiates correctly
-@patch("genbank_seqkit.main.Transcript._fetch_and_populate")
+@patch("genbank_seqkit.transcript.Transcript._fetch_and_populate")
 def test_transcript_init(mock_fetch):
     t = Transcript("NM_000093.5")
     mock_fetch.assert_called_once()
@@ -12,7 +12,7 @@ def test_transcript_init(mock_fetch):
     assert t.dna_sequence is None
 
 # Test _fetch_and_populate() functionality with a fake API call
-@patch("genbank_seqkit.main.fetch_transcript_record")
+@patch("genbank_seqkit.transcript.fetch_transcript_record")
 def test_fetch_and_populate_sets_attributes(mock_fetch):
     mock_fetch.return_value = {
         "GBSeq_accession-version": "NM_000093.5",
