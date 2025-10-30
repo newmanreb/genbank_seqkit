@@ -195,7 +195,7 @@ class Transcript:
                 sequence = self.dna_sequence
             elif seq_type.upper() == "RNA":
                 sequence = self.rna_sequence
-            elif seq_type.upper() == "protein":
+            elif seq_type.lower() == "protein":
                 sequence = self.protein_sequence
             else:
                 logger.error(f"Unknown sequence type requested: {seq_type}")
