@@ -1,44 +1,78 @@
-# src/tests/test_save_record_json.py
+# src/tests/test_entrez_efetch.py
 import pytest
-import json
-from pathlib import Path
 import importlib
 
-# Dynamically import the module so monkeypatching works reliably
-save_mod = importlib.import_module("genbank_seqkit.utils.save_record_json")
-from genbank_seqkit.errors import GenbankError
+# Import the module dynamically
+efetch_mod = importlib.import_module("genbank_seqkit.utils.entrez_efetch")
+errors_mod = importlib.import_module("genbank_seqkit.errors")
 
-dummy_record = {"GBSeq_accession-version": "NM_000093.4"}
+# Dummy record for mocking
+dummy_record = {"GBSeq_locus": "NM_000093"}
 
-def test_save_record_json_default(tmp_path, monkeypatch):
-    """Test saving record with default filename and directory."""
-    monkeypatch.setattr(save_mod, "fetch_transcript_record", lambda tid: dummy_record)
+# -----------------------------
+# Test: Successful fetch
+# -----------------------------
+def test_fetch_transcript_record_success(monkeypatch):
+    """Test that a valid transcript ID returns a parsed record."""
 
-    out_file = save_mod.save_record_json("NM_000093.4", data_dir=tmp_path)
-    assert out_file.exists()
-    with open(out_file) as f:
-        data = json.load(f)
-    assert data == dummy_record
+    # Mock requests.get
+    class DummyResponse:
+        text = "<GBSet><GBSeq><GBSeq_locus>NM_000093</GBSeq_locus></GBSeq></GBSet>"
 
-def test_save_record_json_custom_filename(tmp_path, monkeypatch):
-    """Test saving record with a custom filename."""
-    monkeypatch.setattr(save_mod, "fetch_transcript_record", lambda tid: dummy_record)
-    custom_file = tmp_path / "myfile.json"
-    out_file = save_mod.save_record_json("NM_000093.4", filename=custom_file)
-    assert out_file.exists()
-    assert out_file.name == "myfile.json"
+        def raise_for_status(self):
+            return None  # No exception
 
-def test_save_record_json_pretty_print(tmp_path, monkeypatch, capsys):
-    """Test pretty_print option prints to console."""
-    monkeypatch.setattr(save_mod, "fetch_transcript_record", lambda tid: dummy_record)
-    save_mod.save_record_json("NM_000093.4", data_dir=tmp_path, pretty_print=True)
-    captured = capsys.readouterr()
-    assert "GBSeq_accession-version" in captured.out
+    monkeypatch.setattr(efetch_mod.requests, "get", lambda url, params, timeout: DummyResponse())
+    # Mock xmltodict.parse
+    monkeypatch.setattr(efetch_mod.xmltodict, "parse", lambda text: {"GBSet": {"GBSeq": dummy_record}})
 
-def test_save_record_json_unexpected_error(monkeypatch, tmp_path):
-    """Test that an unexpected exception raises GenbankError."""
-    def raise_error(tid):
-        raise RuntimeError("oops")
-    monkeypatch.setattr(save_mod, "fetch_transcript_record", raise_error)
-    with pytest.raises(GenbankError):
-        save_mod.save_record_json("NM_000093.4", data_dir=tmp_path)
+    result = efetch_mod.fetch_transcript_record("NM_000093.5")
+    assert result == dummy_record
+
+
+# -----------------------------
+# Test: Invalid transcript ID
+# -----------------------------
+@pytest.mark.parametrize("invalid_id", ["AB_000093.5", "NM_000093", "12345"])
+def test_fetch_transcript_record_invalid_id(invalid_id):
+    """Test that invalid transcript IDs raise TranscriptIdError."""
+    with pytest.raises(errors_mod.TranscriptIdError):
+        efetch_mod.fetch_transcript_record(invalid_id)
+
+
+# -----------------------------
+# Test: XML parsing error
+# -----------------------------
+def test_fetch_transcript_record_parse_error(monkeypatch):
+    """Test that XML parsing errors raise GenbankParseError."""
+    class DummyResponse:
+        text = "<invalid></xml>"
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr(efetch_mod.requests, "get", lambda url, params, timeout: DummyResponse())
+    # Force xmltodict.parse to raise
+    def raise_parse(text):
+        raise ValueError("XML invalid")
+
+    monkeypatch.setattr(efetch_mod.xmltodict, "parse", raise_parse)
+
+    with pytest.raises(errors_mod.GenbankParseError):
+        efetch_mod.fetch_transcript_record("NM_000093.5")
+
+
+# -----------------------------
+# Test: Network error
+# -----------------------------
+def test_fetch_transcript_record_network_error(monkeypatch):
+    """Test that network errors raise GenbankFetchError."""
+    import requests
+
+    def raise_request(*args, **kwargs):
+        raise requests.exceptions.RequestException("Network problem")
+
+    monkeypatch.setattr(efetch_mod.requests, "get", raise_request)
+
+    with pytest.raises(errors_mod.GenbankFetchError):
+        efetch_mod.fetch_transcript_record("NM_000093.5")
