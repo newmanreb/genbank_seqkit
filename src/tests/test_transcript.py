@@ -12,6 +12,10 @@ def test_transcript_init(mock_fetch):
     assert t.gene_symbol is None
     assert t.dna_sequence is None
 
+#################################################
+## Testing the _fetch_and_populate() function ##
+#################################################
+
 # Test _fetch_and_populate() functionality with a fake API call
 @patch("genbank_seqkit.transcript.fetch_transcript_record")
 def test_fetch_and_populate_sets_attributes(mock_fetch):
@@ -37,31 +41,6 @@ def test_fetch_and_populate_sets_attributes(mock_fetch):
     t = Transcript("NM_000093.5")
     assert t.gene_symbol == "COL5A1"
     assert t.hgnc_id == "2187"
-
-# Test FASTA format without API calling
-def test_as_fasta_returns_expected_format():
-    t = Transcript.__new__(Transcript)  # bypass __init__ to skip fetching
-    t.transcript_id = "NM_000093.5"
-    t.dna_sequence = "ATGC"
-    fasta = t.as_fasta(seq_type="DNA")
-    assert fasta.startswith(">NM_000093.5 | DNA")
-    assert "ATGC" in fasta
-
-# Test GenBank formatting without API calling
-def test_as_genbank_contains_locus_and_origin():
-    t = Transcript.__new__(Transcript)
-    t.transcript_id = "NM_000093.5"
-    t.dna_sequence = "ATGC"
-    gb = t.as_genbank(seq_type="DNA")
-    assert "LOCUS" in gb
-    assert "ORIGIN" in gb
-
-# Test error handling in as_fasta()
-def test_as_fasta_raises_for_unknown_type():
-    t = Transcript.__new__(Transcript)
-    t.transcript_id = "NM_000093.5"
-    with pytest.raises(ValueError):
-        t.as_fasta(seq_type="invalid")
 
 # Test for parsing for protein sequence and id assignment
 @patch('genbank_seqkit.transcript.fetch_transcript_record')
@@ -118,13 +97,12 @@ def test_missing_attributes_logging(mock_fetch, caplog):
     assert t.dna_sequence == "ATGCGT"
     assert t.rna_sequence == "AUGCGU"
 
-
+# Test custom exception handling in _fetch_and_populate
 @patch("genbank_seqkit.transcript.fetch_transcript_record", side_effect=TranscriptIdError("bad ID"))
 def test_transcript_id_error(mock_fetch):
     """Covers the TranscriptIdError branch."""
     with pytest.raises(TranscriptIdError):
         Transcript("NM_BADID")
-
 
 @patch("genbank_seqkit.transcript.fetch_transcript_record", side_effect=GenbankFetchError("fetch failed"))
 def test_genbank_fetch_error(mock_fetch):
@@ -132,13 +110,11 @@ def test_genbank_fetch_error(mock_fetch):
     with pytest.raises(GenbankFetchError):
         Transcript("NM_FETCHFAIL")
 
-
 @patch("genbank_seqkit.transcript.fetch_transcript_record", side_effect=GenbankParseError("parse failed"))
 def test_genbank_parse_error(mock_fetch):
     """Covers the GenbankParseError branch."""
     with pytest.raises(GenbankParseError):
         Transcript("NM_PARSEFAIL")
-
 
 @patch("genbank_seqkit.transcript.fetch_transcript_record", side_effect=Exception("unexpected failure"))
 def test_generic_exception_branch(mock_fetch):
@@ -159,9 +135,39 @@ def test_transcriptid_error_handling(caplog):
                 transcript._fetch_and_populate(verbose=True)
         assert any("Error processing transcript" in m for m in [rec.message for rec in caplog.records])
 
+
+######################################
+## Testing the as_fasta() function ##
+######################################
+
+# Test FASTA format without API calling
+def test_as_fasta_returns_expected_format():
+    t = Transcript.__new__(Transcript)  # bypass __init__ to skip fetching
+    t.transcript_id = "NM_000093.5"
+    t.dna_sequence = "ATGC"
+    fasta = t.as_fasta(seq_type="DNA")
+    assert fasta.startswith(">NM_000093.5 | DNA")
+    assert "ATGC" in fasta
+
+# Test error handling in as_fasta()
+def test_as_fasta_raises_for_unknown_type():
+    t = Transcript.__new__(Transcript)
+    t.transcript_id = "NM_000093.5"
+    with pytest.raises(ValueError):
+        t.as_fasta(seq_type="invalid")
+
 #######################################
 ## Testing the as_genbank() function ##
 #######################################
+
+# Test GenBank formatting without API calling
+def test_as_genbank_contains_locus_and_origin():
+    t = Transcript.__new__(Transcript)
+    t.transcript_id = "NM_000093.5"
+    t.dna_sequence = "ATGC"
+    gb = t.as_genbank(seq_type="DNA")
+    assert "LOCUS" in gb
+    assert "ORIGIN" in gb
 
 @pytest.fixture
 def transcript():
