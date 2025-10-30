@@ -1,5 +1,6 @@
 import pytest
 from genbank_seqkit.transcript import Transcript
+from genbank_seqkit.errors import GenbankError, TranscriptIdError, GenbankFetchError, GenbankParseError
 from unittest.mock import patch
 
 # Test that a Transcript object instantiates correctly
@@ -62,38 +63,101 @@ def test_as_fasta_raises_for_unknown_type():
     with pytest.raises(ValueError):
         t.as_fasta(seq_type="invalid")
 
-# Test CDS qualifiers correctly set protein sequence and ID.
-def test_cds_and_protein_info(monkeypatch):
-    # Create a dummy Transcript object without triggering network calls
-    transcript = Transcript.__new__(Transcript)
-    transcript.protein_sequence = None
-    transcript.protein_id = None
+# Test for parsing for protein sequence and id assignment
+@patch('genbank_seqkit.transcript.fetch_transcript_record')
+def test_cds_and_protein_info_coverage(mock_fetch):
+    """Covers the CDS feature parsing and protein_sequence / protein_id assignment."""
+    mock_fetch.return_value = {
+        'GBSeq_accession-version': 'NM_123456',
+        'GBSeq_sequence': 'ATGCGT',
+        'GBSeq_feature-table': {
+            'GBFeature': [
+                {
+                    'GBFeature_key': 'CDS',
+                    'GBFeature_quals': {
+                        'GBQualifier': [
+                            {'GBQualifier_name': 'translation', 'GBQualifier_value': 'MTEYK'},
+                            {'GBQualifier_name': 'protein_id', 'GBQualifier_value': 'NP_123456.1'}
+                        ]
+                    }
+                }
+            ]
+        }
+    }
 
-    # Mock logger so it doesn’t try to write to a file
-    class DummyLogger:
-        def debug(self, msg): pass
+    transcript = Transcript("NM_123456")
 
-    temp_logger = DummyLogger()
+    assert transcript.protein_sequence == "MTEYK"
+    assert transcript.protein_id == "NP_123456.1"
+    assert transcript.dna_sequence == "ATGCGT"
+    assert transcript.length is None  # still fine since mock record omits GBSeq_length
 
-    # Simulate CDS feature with translation and protein_id qualifiers
-    key = "CDS"
-    quals = [
-        {"GBQualifier_name": "translation", "GBQualifier_value": "MTEYKLVVVG"},
-        {"GBQualifier_name": "protein_id", "GBQualifier_value": "NP_001234567.1"}
-    ]
+# Test for warnings for missing attributes in _fetch_and_populate
+@patch("genbank_seqkit.transcript.fetch_transcript_record")
+def test_missing_attributes_logging(mock_fetch, caplog):
+    """Covers missing gene_symbol, hgnc_id, protein_sequence, and protein_id warnings."""
+    # Return a minimal record missing those fields
+    mock_fetch.return_value = {
+        "GBSeq_accession-version": "NM_999999",
+        "GBSeq_sequence": "ATGCGT",
+        "GBSeq_feature-table": {"GBFeature": []}
+    }
 
-    # Execute the same logic you use in the method
-    for q in quals:
-        if q.get("GBQualifier_name") == "translation":
-            transcript.protein_sequence = q.get("GBQualifier_value")
-            temp_logger.debug(f"Protein sequence found, length={len(transcript.protein_sequence)}")
-        elif q.get("GBQualifier_name") == "protein_id":
-            transcript.protein_id = q.get("GBQualifier_value")
-            temp_logger.debug(f"Protein ID found: {transcript.protein_id}")
+    with caplog.at_level("WARNING"):
+        t = Transcript("NM_999999")
 
-    # Assertions to verify behaviour
-    assert transcript.protein_sequence == "MTEYKLVVVG"
-    assert transcript.protein_id == "NP_001234567.1"
+    # Ensure all expected warnings are present
+    warnings = [r.message for r in caplog.records if r.levelname == "WARNING"]
+    assert any("No gene symbol found" in w for w in warnings)
+    assert any("No hgnc ID found" in w for w in warnings)
+    assert any("No protein sequence found" in w for w in warnings)
+    assert any("Protein ID missing" in w for w in warnings)
+
+    # Confirm that the transcript initialized successfully
+    assert t.transcript_id == "NM_999999"
+    assert t.dna_sequence == "ATGCGT"
+    assert t.rna_sequence == "AUGCGU"
+
+
+@patch("genbank_seqkit.transcript.fetch_transcript_record", side_effect=TranscriptIdError("bad ID"))
+def test_transcript_id_error(mock_fetch):
+    """Covers the TranscriptIdError branch."""
+    with pytest.raises(TranscriptIdError):
+        Transcript("NM_BADID")
+
+
+@patch("genbank_seqkit.transcript.fetch_transcript_record", side_effect=GenbankFetchError("fetch failed"))
+def test_genbank_fetch_error(mock_fetch):
+    """Covers the GenbankFetchError branch."""
+    with pytest.raises(GenbankFetchError):
+        Transcript("NM_FETCHFAIL")
+
+
+@patch("genbank_seqkit.transcript.fetch_transcript_record", side_effect=GenbankParseError("parse failed"))
+def test_genbank_parse_error(mock_fetch):
+    """Covers the GenbankParseError branch."""
+    with pytest.raises(GenbankParseError):
+        Transcript("NM_PARSEFAIL")
+
+
+@patch("genbank_seqkit.transcript.fetch_transcript_record", side_effect=Exception("unexpected failure"))
+def test_generic_exception_branch(mock_fetch):
+    """Covers the generic Exception -> GenbankError branch."""
+    with pytest.raises(GenbankError):
+        Transcript("NM_GENERIC")
+
+# Test to cover TranscriptIdError in _fetch_and_populate
+def test_transcriptid_error_handling(caplog):
+    """Cover TranscriptIdError in _fetch_and_populate."""
+    from genbank_seqkit.errors import TranscriptIdError
+
+    with patch('genbank_seqkit.transcript.fetch_transcript_record', side_effect=TranscriptIdError("bad ID")):
+        transcript = Transcript.__new__(Transcript)
+        transcript.transcript_id = "BAD_ID"
+        with caplog.at_level("ERROR"):
+            with pytest.raises(TranscriptIdError):
+                transcript._fetch_and_populate(verbose=True)
+        assert any("Error processing transcript" in m for m in [rec.message for rec in caplog.records])
 
 #######################################
 ## Testing the as_genbank() function ##
