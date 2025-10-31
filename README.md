@@ -1,8 +1,8 @@
 # GenBank SeqKit
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org/)
-[![Build Status](https://github.com/<yourusername>/genbank_seqkit/actions/workflows/main.yml/badge.svg)](https://github.com/newmanreb/genbank_seqkit/actions)
-[![Coverage Status](https://codecov.io/gh/<yourusername>/genbank_seqkit/branch/main/graph/badge.svg?token=<CODECOV_TOKEN>)](https://codecov.io/gh/newmanreb/genbank_seqkit)
+[![Build Status](https://github.com/newmanreb/genbank_seqkit/actions/workflows/main.yml/badge.svg)](https://github.com/newmanreb/genbank_seqkit/actions)
+[![Coverage Status](https://codecov.io/gh/newmanreb/genbank_seqkit/branch/main/graph/badge.svg?token=547d98fc-a33b-4e55-a3b6-eda0e5c1255a)](https://codecov.io/gh/newmanreb/genbank_seqkit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Version 1.0**
